@@ -15,5 +15,6 @@
     },
   "permissions": [
       "tabs"
-  ]
+  ],
+  "web_accessible_resources" : ["/src/contentScript.js"],
 }

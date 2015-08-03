@@ -1,50 +1,22 @@
-var connections = {};
-
-chrome.runtime.onConnect.addListener(function (port) {
-    console.log('test3');
-    var extensionListener = function (message, sender, sendResponse) {
-        console.log('test2');
-        // The original connection event doesn't include the tab ID of the
-        // DevTools page, so we need to send it explicitly.
-        if (message.name == "init") {
-            connections[message.tabId] = port;
-            return;
-        }
-
-        // other message handling
-    }
-
-    // Listen to messages sent from the DevTools page
-    port.onMessage.addListener(extensionListener);
-
-    port.onDisconnect.addListener(function(port) {
-        port.onMessage.removeListener(extensionListener);
-
-        var tabs = Object.keys(connections);
-        for (var i=0, len=tabs.length; i < len; i++) {
-            if (connections[tabs[i]] == port) {
-                delete connections[tabs[i]]
-                break;
-            }
-        }
+var ports = [];
+chrome.runtime.onConnect.addListener(function(port) {
+    if (port.name !== "devtools") return;
+    ports.push(port);
+    // Remove port when destroyed (eg when devtools instance is closed)
+    port.onDisconnect.addListener(function() {
+        var i = ports.indexOf(port);
+        if (i !== -1) ports.splice(i, 1);
+    });
+    port.onMessage.addListener(function(msg) {
+        // Received message from devtools. Do something:
+        console.log(msg);
     });
 });
+// Function to send a message to all devtools.html views:
+function notifyDevtools(msg) {
+    ports.forEach(function(port) {
+        port.postMessage(msg);
+    });
+}
 
-// Receive message from content script and relay to the devTools page for the
-// current tab
-
-chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-    // Messages from content scripts should have sender.tab set
-    console.log('test');
-    if (sender.tab) {
-        var tabId = sender.tab.id;
-        if (tabId in connections) {
-            connections[tabId].postMessage(request);
-        } else {
-            console.log("Tab not found in connection list.");
-        }
-    } else {
-        console.log("sender.tab not defined.");
-    }
-    return true;
-});
+setInterval(notifyDevtools, 1000);
